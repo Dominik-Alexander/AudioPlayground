@@ -57,6 +57,8 @@
 
 #include <Audio.h>
 
+#include <random>
+
 namespace DX
 {
     // Helper class for COM exceptions

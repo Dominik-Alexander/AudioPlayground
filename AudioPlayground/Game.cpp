@@ -11,13 +11,21 @@ using namespace DirectX;
 
 using Microsoft::WRL::ComPtr;
 
-Game::Game() noexcept(false)
+Game::Game() noexcept(false) : m_retryAudio(false)
 {
     m_deviceResources = std::make_unique<DX::DeviceResources>();
     // TODO: Provide parameters for swapchain format, depth/stencil format, and backbuffer count.
     //   Add DX::DeviceResources::c_AllowTearing to opt-in to variable rate displays.
     //   Add DX::DeviceResources::c_EnableHDR for HDR10 display.
     m_deviceResources->RegisterDeviceNotify(this);
+}
+
+Game::~Game()
+{
+    if (m_audEngine)
+    {
+        m_audEngine->Suspend();
+    }
 }
 
 // Initialize the Direct3D resources required to run.
@@ -37,6 +45,27 @@ void Game::Initialize(HWND window, int width, int height)
     m_timer.SetFixedTimeStep(true);
     m_timer.SetTargetElapsedSeconds(1.0 / 60);
     */
+
+    AUDIO_ENGINE_FLAGS eflags = AudioEngine_Default;
+#ifdef _DEBUG
+    eflags |= AudioEngine_Debug;
+#endif
+    m_audEngine = std::make_unique<AudioEngine>(eflags);
+
+    if (!m_audEngine->IsAudioDevicePresent())
+    {
+        // we are in 'silent mode'.
+    }
+
+    m_explode = std::make_unique<SoundEffect>(m_audEngine.get(),
+        L"Sounds\\media_Explo1.wav");
+    m_ambient = std::make_unique<SoundEffect>(m_audEngine.get(),
+        L"Sounds\\media_NightAmbienceSimple_02.wav");
+
+    std::random_device rd;
+    m_random = std::make_unique<std::mt19937>(rd());
+
+    explodeDelay = 2.f;
 }
 
 #pragma region Frame Update
@@ -57,6 +86,31 @@ void Game::Update(DX::StepTimer const& timer)
     float elapsedTime = float(timer.GetElapsedSeconds());
 
     // TODO: Add your game logic here.
+    if (m_retryAudio)
+    {
+        m_retryAudio = false;
+        if (m_audEngine->Reset())
+        {
+            // TODO: restart any looped sounds here
+        }
+    }
+    else if (!m_audEngine->Update())
+    {
+        if (m_audEngine->IsCriticalError())
+        {
+            m_retryAudio = true;
+        }
+    }
+
+    explodeDelay -= elapsedTime;
+    if (explodeDelay < 0.f)
+    {
+        m_explode->Play();
+
+        std::uniform_real_distribution<float> dist(1.f, 10.f);
+        explodeDelay = dist(*m_random);
+    }
+
     elapsedTime;
 }
 #pragma endregion
@@ -122,6 +176,7 @@ void Game::OnDeactivated()
 void Game::OnSuspending()
 {
     // TODO: Game is being power-suspended (or minimized).
+    m_audEngine->Suspend();
 }
 
 void Game::OnResuming()
@@ -129,6 +184,9 @@ void Game::OnResuming()
     m_timer.ResetElapsedTime();
 
     // TODO: Game is being power-resumed (or returning from minimize).
+    m_audEngine->Resume();
+
+    explodeDelay = 2.f;
 }
 
 void Game::OnWindowMoved()
