@@ -7,7 +7,7 @@
 
 #include <winsdkver.h>
 #ifndef _WIN32_WINNT
-#define _WIN32_WINNT 0x0601
+#define _WIN32_WINNT 0x0A00
 #endif
 #include <sdkddkver.h>
 
@@ -54,6 +54,10 @@
 #ifdef _DEBUG
 #include <dxgidebug.h>
 #endif
+
+#include <Audio.h>
+
+#include <random>
 
 namespace DX
 {

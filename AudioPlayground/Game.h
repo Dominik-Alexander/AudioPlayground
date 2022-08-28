@@ -15,7 +15,6 @@ class Game final : public DX::IDeviceNotify
 public:
 
     Game() noexcept(false);
-    ~Game() = default;
 
     Game(Game&&) = default;
     Game& operator= (Game&&) = default;
@@ -45,6 +44,10 @@ public:
     // Properties
     void GetDefaultSize( int& width, int& height ) const noexcept;
 
+    void OnNewAudioDevice() noexcept { m_retryAudio = true; }
+
+    ~Game();
+
 private:
 
     void Update(DX::StepTimer const& timer);
@@ -60,4 +63,19 @@ private:
 
     // Rendering loop timer.
     DX::StepTimer                           m_timer;
+
+    std::unique_ptr<DirectX::AudioEngine> m_audEngine;
+
+    bool m_retryAudio;
+
+    std::unique_ptr<DirectX::SoundEffect> m_explode;
+    std::unique_ptr<DirectX::SoundEffect> m_ambient;
+
+    std::unique_ptr<std::mt19937> m_random;
+    float explodeDelay;
+
+    std::unique_ptr<DirectX::SoundEffectInstance> m_nightLoop;
+
+    float nightVolume;
+    float nightSlide;
 };

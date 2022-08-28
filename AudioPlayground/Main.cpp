@@ -5,6 +5,9 @@
 #include "pch.h"
 #include "Game.h"
 
+#include <Dbt.h>
+#include <ksmedia.h>
+
 using namespace DirectX;
 
 #ifdef __clang__
@@ -45,6 +48,8 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
         return 1;
 
     g_game = std::make_unique<Game>();
+
+    HDEVNOTIFY hNewAudio = nullptr;
 
     // Register class and create window
     {
@@ -87,6 +92,15 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
         GetClientRect(hwnd, &rc);
 
         g_game->Initialize(hwnd, rc.right - rc.left, rc.bottom - rc.top);
+
+        // Listen for new audio devices
+        DEV_BROADCAST_DEVICEINTERFACE filter = {};
+        filter.dbcc_size = sizeof(filter);
+        filter.dbcc_devicetype = DBT_DEVTYP_DEVICEINTERFACE;
+        filter.dbcc_classguid = KSCATEGORY_AUDIO;
+
+        hNewAudio = RegisterDeviceNotification(hwnd, &filter,
+            DEVICE_NOTIFY_WINDOW_HANDLE);
     }
 
     // Main message loop
@@ -105,6 +119,12 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     }
 
     g_game.reset();
+
+    if (hNewAudio)
+    {
+        UnregisterDeviceNotification(hNewAudio);
+        hNewAudio = nullptr;
+    }
 
     CoUninitialize();
 
@@ -273,6 +293,26 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         // A menu is active and the user presses a key that does not correspond
         // to any mnemonic or accelerator key. Ignore so we don't produce an error beep.
         return MAKELRESULT(0, MNC_CLOSE);
+
+    case WM_DEVICECHANGE:
+        if (wParam == DBT_DEVICEARRIVAL)
+        {
+            auto pDev = reinterpret_cast<PDEV_BROADCAST_HDR>(lParam);
+            if (pDev)
+            {
+                if (pDev->dbch_devicetype == DBT_DEVTYP_DEVICEINTERFACE)
+                {
+                    auto pInter = reinterpret_cast<
+                        const PDEV_BROADCAST_DEVICEINTERFACE>(pDev);
+                    if (pInter->dbcc_classguid == KSCATEGORY_AUDIO)
+                    {
+                        if (game)
+                            game->OnNewAudioDevice();
+                    }
+                }
+            }
+        }
+        return 0;
     }
 
     return DefWindowProc(hWnd, message, wParam, lParam);
