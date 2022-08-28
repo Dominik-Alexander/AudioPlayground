@@ -73,4 +73,6 @@ private:
 
     std::unique_ptr<std::mt19937> m_random;
     float explodeDelay;
+
+    std::unique_ptr<DirectX::SoundEffectInstance> m_nightLoop;
 };
